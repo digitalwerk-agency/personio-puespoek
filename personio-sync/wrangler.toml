@@ -1,0 +1,13 @@
+name = "personio-webflow-sync"
+main = "src/worker.js"
+compatibility_date = "2024-12-01"
+
+# Sync alle 6 Stunden
+[triggers]
+crons = ["0 */6 * * *"]
+
+[vars]
+PERSONIO_XML_URL = "https://puespoek.jobs.personio.com/xml"
+# WEBFLOW_COLLECTION_ID und WEBFLOW_API_TOKEN als Secrets setzen:
+# npx wrangler secret put WEBFLOW_API_TOKEN
+# npx wrangler secret put WEBFLOW_COLLECTION_ID
