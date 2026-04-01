@@ -129,7 +129,9 @@ function buildRichTextDescription(jobDescriptions) {
     .map((desc) => `<h3>${desc.name}</h3>\n${desc.value}`)
     .join("\n")
     .replace(/<strong>?\s*<em>\s*<span[^>]*>#LI-DNI<\/span>\s*<\/em>\s*<\/strong>?\s*/g, "")
-    .replace(/#LI-DNI/g, "");
+    .replace(/#LI-DNI/g, "")
+    .replace(/\s*style="[^"]*"/g, "")
+    .replace(/<span>([\s\S]*?)<\/span>/g, "$1");
 }
 
 function buildAllLocations(office, additionalOffices) {
