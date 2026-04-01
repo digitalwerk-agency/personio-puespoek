@@ -14,6 +14,7 @@
 const LABELS = {
   employmentType: {
     permanent: "Festanstellung",
+    temporary: "Befristet",
     intern: "Praktikum",
     trainee: "Trainee",
     freelance: "Freelance",
@@ -126,7 +127,9 @@ function buildRichTextDescription(jobDescriptions) {
   // RichText-HTML fuer Webflow
   return jobDescriptions
     .map((desc) => `<h3>${desc.name}</h3>\n${desc.value}`)
-    .join("\n");
+    .join("\n")
+    .replace(/<strong>?\s*<em>\s*<span[^>]*>#LI-DNI<\/span>\s*<\/em>\s*<\/strong>?\s*/g, "")
+    .replace(/#LI-DNI/g, "");
 }
 
 function buildAllLocations(office, additionalOffices) {
@@ -162,15 +165,18 @@ function personioJobToWebflowItem(job) {
   // Mapped ein Personio-Job auf Webflow CMS fieldData.
   // Die Feld-Slugs muessen mit der Webflow Collection uebereinstimmen.
   // Anpassen wenn die Collection andere Slugs hat!
+  const location = job.office ? ` in ${job.office}` : "";
   return {
     name: job.name,
     slug: toSlug(`${job.name}-${job.personioId}`),
+    "meta-seo-title": `${job.name}${location} | PÜSPÖK Karriere`,
+    "meta-seo-description": `Jetzt bewerben: ${job.name}${location}. Werde Teil von PÜSPÖK, Österreichs größtem privaten Erzeuger erneuerbarer Energie.`,
     "personio-id": job.personioId,
     standort: job.office,
     "alle-standorte": buildAllLocations(job.office, job.additionalOffices),
     abteilung: job.department,
     kategorie: job.recruitingCategory,
-    beschreibung: buildRichTextDescription(job.jobDescriptions),
+    body: buildRichTextDescription(job.jobDescriptions),
     anstellungsart:
       LABELS.employmentType[job.employmentType] || job.employmentType,
     seniority: LABELS.seniority[job.seniority] || job.seniority,

@@ -1,132 +1,93 @@
-# Personio Job-Sync fuer Puespoek Webflow-Site
+# Personio → Webflow Job-Sync | PÜSPÖK
 
-Hi Dorian,
+## Status: LIVE
 
-hier ist das fertige Sync-Script, das die offenen Stellen von Puespoek aus dem
-Personio XML-Feed automatisch in die Webflow CMS Job-Collection synchronisiert.
+Der Sync ist deployed und läuft automatisch alle 6 Stunden.
+
+- **Worker URL:** `https://personio-webflow-sync.puespoek.workers.dev`
+- **Cloudflare Account:** Raphael (puespoek.workers.dev)
+- **Webflow Site:** PÜSPÖK (digitalwerk-agency Workspace)
+- **Collection:** Jobs (ID: `69c396e5be115a97f09524f8`, Slug: `offene-stellen`)
+
+---
 
 ## Wie es funktioniert
 
-Ein **Cloudflare Worker** (kostenlos im Free-Plan) laueft alle 6 Stunden und:
+```
+Personio XML Feed          Cloudflare Worker           Webflow CMS
+(alle offenen Stellen)     (alle 6h via Cron)          (Collection "Jobs")
 
-1. Holt das XML von `https://puespoek.jobs.personio.com/xml`
-2. Parst alle offenen Stellen
-3. Vergleicht mit den bestehenden Webflow CMS Items (ueber die Personio-ID)
-4. Erstellt neue Jobs, aktualisiert geaenderte, loescht entfernte
-5. Published alle Aenderungen automatisch
+puespoek.jobs.personio     personio-webflow-sync       CMS Items mit
+  .com/xml                   .puespoek.workers.dev       personio-id
+       │                            │                         │
+       │   1. XML abrufen           │                         │
+       │◄───────────────────────────│                         │
+       │                            │                         │
+       │   2. Jobs parsen &         │   3. Vergleich via      │
+       │      transformieren        │      personio-id        │
+       │                            │◄────────────────────────│
+       │                            │                         │
+       │                            │   4. Create/Update/     │
+       │                            │      Delete + Publish   │
+       │                            │────────────────────────►│
+```
 
-## Was du brauchst
+### Sync-Logik
 
-- **Node.js** >= 18
-- **Cloudflare Account** (Free-Plan reicht)
-- **Webflow API Token** mit CMS Read/Write Berechtigung
+1. **XML abrufen** von `https://puespoek.jobs.personio.com/xml`
+2. **Parsen** aller offenen Stellen aus dem XML
+3. **Vergleich** mit bestehenden Webflow CMS Items über das Feld `personio-id`
+4. **Neue Stellen** → CMS Item erstellen
+5. **Geänderte Stellen** → CMS Item aktualisieren
+6. **Entfernte Stellen** (nicht mehr im Feed) → CMS Item löschen
+7. **Auto-Publish** aller Änderungen
 
-## Setup in 5 Schritten
+---
 
-### 1. CMS Collection in Webflow anlegen
+## Feldmapping: Personio → Webflow
 
-Erstelle eine neue Collection **"Jobs"** (Singular: "Job", Slug: `jobs`) mit diesen Feldern:
+### Automatisch vom Worker befüllt (werden alle 6h aktualisiert)
 
-| Feld-Name | Typ | Anmerkung |
+| Webflow Feld-Slug | Typ | Quelle |
 |---|---|---|
-| Name | Plain Text | Pflichtfeld, Stellentitel |
-| Personio ID | Plain Text | Pflichtfeld, zum Sync-Abgleich |
-| Standort | Plain Text | Hauptstandort (z.B. "Parndorf") |
-| Alle Standorte | Plain Text | Komma-getrennt (z.B. "Parndorf, Remote, Wien") |
-| Abteilung | Plain Text | z.B. "Projektentwicklung" |
-| Kategorie | Plain Text | Recruiting-Kategorie |
-| Beschreibung | Rich Text | Alle Job-Descriptions zusammengefuegt |
-| Anstellungsart | Plain Text | Deutsch: Festanstellung / Praktikum / Trainee / Freelance |
-| Seniority | Plain Text | Deutsch: Berufserfahren / Berufseinsteiger / etc. |
-| Arbeitszeit | Plain Text | Deutsch: Vollzeit / Teilzeit / Voll- oder Teilzeit |
-| Erfahrung | Plain Text | z.B. "2-5" (Jahre) |
-| Gehalt | Plain Text | z.B. "ab EUR 4.500 brutto/Monat" |
-| Bewerbungslink | Link | Automatisch: `https://puespoek.jobs.personio.com/job/{id}` |
-| Erstellt am | Date/Time | Erstellungsdatum der Stelle |
+| `name` | PlainText | Stellentitel aus Personio |
+| `slug` | PlainText | Auto-generiert: `{titel}-{personio-id}` |
+| `meta-seo-title` | PlainText | Auto: `{Titel} in {Standort} \| PÜSPÖK Karriere` |
+| `meta-seo-description` | PlainText | Auto: `Jetzt bewerben: {Titel} in {Standort}...` |
+| `personio-id` | PlainText | Personio Job-ID (Sync-Key, nicht ändern!) |
+| `standort` | PlainText | Haupt-Standort |
+| `alle-standorte` | PlainText | Alle Standorte kommasepariert |
+| `abteilung` | PlainText | Department |
+| `kategorie` | PlainText | Recruiting-Kategorie |
+| `body` | RichText | Job-Beschreibung (Dein Job / Dein Profil / Dein Vorteil) |
+| `anstellungsart` | PlainText | Festanstellung, Befristet, Praktikum, Trainee, Freelance |
+| `seniority` | PlainText | Berufseinsteiger, Berufserfahren, Führungskraft, Student/Praktikant |
+| `arbeitszeit` | PlainText | Vollzeit, Teilzeit, Voll- oder Teilzeit |
+| `erfahrung` | PlainText | Jahre Berufserfahrung |
+| `gehalt` | PlainText | z.B. "ab EUR 4.500 brutto/Monat" |
+| `bewerbungslink` | Link | `https://puespoek.jobs.personio.com/job/{id}` |
+| `erstellt-am` | DateTime | Erstellungsdatum in Personio |
 
-**Wichtig:** Die Feld-Slugs in Webflow muessen mit dem Script uebereinstimmen.
-Webflow generiert Slugs automatisch aus dem Feld-Namen. Falls sie abweichen,
-in `src/worker.js` → Funktion `personioJobToWebflowItem()` anpassen.
+### Manuell in Webflow pflegbar (werden NICHT überschrieben)
 
-### 2. Webflow API Token holen
-
-1. Webflow Dashboard → Site Settings → Apps & Integrations → API Access
-2. Token generieren mit **CMS Read/Write** Berechtigungen
-3. Collection ID findest du in der URL wenn du die Collection im Dashboard oeffnest
-
-### 3. Worker deployen
-
-```bash
-cd personio-sync
-npm install
-
-# Secrets setzen (interaktive Eingabe)
-npx wrangler secret put WEBFLOW_API_TOKEN
-npx wrangler secret put WEBFLOW_COLLECTION_ID
-
-# Deployen
-npm run deploy
-```
-
-### 4. Testen
-
-```bash
-# Lokal starten
-npm run dev
-
-# Vorschau: zeigt die Personio-Daten als JSON (ohne Webflow-Push)
-curl http://localhost:8787/preview
-
-# Manuellen Sync ausloesen
-curl -X POST http://localhost:8787/sync
-```
-
-### 5. Fertig
-
-Der Worker laeuft ab jetzt automatisch alle 6 Stunden.
-Du kannst den Cron in `wrangler.toml` anpassen:
-
-```toml
-[triggers]
-crons = ["0 */6 * * *"]   # alle 6 Stunden (Standard)
-# crons = ["0 8 * * *"]   # taeglich um 8:00 UTC
-# crons = ["*/30 * * * *"] # alle 30 Minuten
-```
-
-## Endpoints nach dem Deploy
-
-| Endpoint | Methode | Was es tut |
+| Webflow Feld-Slug | Typ | Verwendung |
 |---|---|---|
-| `/` | GET | Status & Info anzeigen |
-| `/preview` | GET | Personio-Daten als JSON ansehen (kein Webflow-Push) |
-| `/sync` | POST | Manuellen Sync ausloesen |
+| `image` | Image | Bild für die Stellenanzeige |
+| `image-alt-text` | PlainText | Alt-Text für das Bild |
+| `tags` | MultiReference | Job Tags (m/W/D, Remote, Standorte etc.) |
+| `order` | Number | Sortierreihenfolge |
+| `related-jobs` | MultiReference | Verwandte Stellen |
 
-## Wie der Sync arbeitet
-
-```
-Personio XML                    Webflow CMS
-┌──────────────┐               ┌──────────────┐
-│ Position 1   │──── neu? ────▶│ Item erstellen│
-│ Position 2   │── gleich? ──▶│ Item updaten  │
-│ Position 3   │               │ Item 4 weg?  │──▶ loeschen
-└──────────────┘               └──────────────┘
-                                      │
-                                      ▼
-                               Auto-Publish
-```
-
-- Abgleich ueber das Feld `personio-id`
-- Neue Stellen werden erstellt
-- Bestehende werden aktualisiert (Titel, Beschreibung, Standort, etc.)
-- Stellen die nicht mehr im Feed sind werden aus dem CMS entfernt
+---
 
 ## Deutsches Label-Mapping
 
-Die englischen Personio-Werte werden automatisch uebersetzt:
+Englische Personio-Werte werden automatisch übersetzt:
 
 | Personio | Webflow |
 |---|---|
 | permanent | Festanstellung |
+| temporary | Befristet |
 | intern | Praktikum |
 | trainee | Trainee |
 | freelance | Freelance |
@@ -135,11 +96,103 @@ Die englischen Personio-Werte werden automatisch uebersetzt:
 | full-or-part-time | Voll- oder Teilzeit |
 | entry-level | Berufseinsteiger |
 | experienced | Berufserfahren |
-| executive | Fuehrungskraft |
+| executive | Führungskraft |
 | student | Student/Praktikant |
 
-## Bei Fragen
+---
 
-Das Script liegt in `personio-sync/src/worker.js` und ist ausfuehrlich kommentiert.
-Die zentrale Stelle zum Anpassen ist die Funktion `personioJobToWebflowItem()` –
-dort wird jedes Personio-Feld auf ein Webflow-CMS-Feld gemappt.
+## Endpoints
+
+| Endpoint | Methode | Beschreibung |
+|---|---|---|
+| `/` | GET | Status & Info |
+| `/preview` | GET | Personio-Daten als JSON ansehen (kein Push) |
+| `/sync` | POST | Manuellen Sync auslösen |
+
+### Manueller Sync
+
+```bash
+curl -X POST https://personio-webflow-sync.puespoek.workers.dev/sync
+```
+
+---
+
+## Automatischer Cron
+
+Der Worker läuft alle 6 Stunden automatisch (0:00, 6:00, 12:00, 18:00 UTC).
+
+Cron-Schedule ändern in `wrangler.toml`:
+
+```toml
+[triggers]
+crons = ["0 */6 * * *"]    # alle 6 Stunden (aktuell)
+# crons = ["0 8 * * *"]    # täglich um 8:00 UTC
+# crons = ["*/30 * * * *"] # alle 30 Minuten
+```
+
+Nach Änderung: `npx wrangler deploy`
+
+---
+
+## Technischer Stack
+
+| Komponente | Details |
+|---|---|
+| **Runtime** | Cloudflare Workers (Free Plan) |
+| **Source** | `personio-sync/src/worker.js` |
+| **Config** | `personio-sync/wrangler.toml` |
+| **Personio Feed** | `https://puespoek.jobs.personio.com/xml` |
+| **Webflow API** | v2, CMS Collection Items |
+| **Secrets** | `WEBFLOW_API_TOKEN`, `WEBFLOW_COLLECTION_ID` |
+
+---
+
+## Secrets & Zugänge
+
+Secrets sind in Cloudflare Workers gesetzt (nicht im Code):
+
+```bash
+# Secrets anzeigen (nur Namen, nicht Werte)
+npx wrangler secret list
+
+# Secret neu setzen
+npx wrangler secret put WEBFLOW_API_TOKEN
+npx wrangler secret put WEBFLOW_COLLECTION_ID
+```
+
+Collection ID: `69c396e5be115a97f09524f8`
+
+Webflow API Token: In Webflow → Workspace Settings → Integrations → API Access generieren (CMS Read/Write Rechte).
+
+---
+
+## Sonderfälle & Bereinigungen
+
+- **#LI-DNI Tags:** LinkedIn "Do Not Index" Tags aus Personio werden automatisch aus dem Body-Text entfernt
+- **HTML-Entities:** `&amp;` etc. kommen direkt aus Personio und werden von Webflow korrekt gerendert
+- **Leere Felder:** Wenn Personio kein Gehalt/Erfahrung liefert, bleibt das Feld in Webflow leer
+
+---
+
+## Neu deployen
+
+```bash
+cd personio-sync
+npx wrangler login       # falls nicht eingeloggt
+npx wrangler deploy      # Worker deployen
+```
+
+---
+
+## Projektdateien
+
+```
+personio-puespoek/
+├── personio-sync/
+│   ├── src/
+│   │   └── worker.js        # Haupt-Script (alles in einer Datei)
+│   ├── wrangler.toml         # Worker-Config & Cron
+│   └── package.json
+├── CLAUDE.md                 # Projekt-Kontext für Claude Code
+└── HANDOVER-DORIAN.md        # Diese Datei
+```
