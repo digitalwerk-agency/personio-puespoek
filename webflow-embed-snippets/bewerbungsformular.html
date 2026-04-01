@@ -1,0 +1,311 @@
+<style>
+  /* Nur Styles die NICHT schon im Webflow CSS existieren */
+
+  /* File upload als Input mit Icon */
+  .pf-file { position:relative; width:100%; cursor:pointer; }
+  .pf-file input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2; }
+  .pf-file-display {
+    display:flex; align-items:center; justify-content:space-between;
+    height:55px; width:100%;
+    padding:0.5rem 1rem;
+    border:1px solid rgba(255,255,255,0.4);
+    border-radius:var(--radius--small, 0.25rem);
+    background:transparent;
+    transition:all 300ms ease;
+    pointer-events:none;
+  }
+  .pf-file:hover .pf-file-display,
+  .pf-file.is-dragover .pf-file-display { border-color:rgba(255,255,255,0.8); }
+  .pf-file-display .pf-file-text { color:rgba(255,255,255,0.35); font-size:1rem; line-height:120%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; flex:1; }
+  .pf-file-display .pf-file-text.has-file { color:var(--colors--green, #55ec82); }
+  .pf-file-display .pf-file-icon { flex-shrink:0; width:24px; height:24px; margin-left:0.75rem; opacity:0.4; }
+  .pf-file:hover .pf-file-icon { opacity:0.7; }
+
+  /* Conditional fields */
+  .pf-conditional { display:none; width:100%; }
+  .pf-conditional.is-visible { display:block; }
+
+  /* Link im Datenschutz-Text */
+  .checkbox-toggle-field a { color:white; text-decoration:underline; }
+  .checkbox-toggle-field a:hover { opacity:0.7; }
+
+  /* Validation: rote Border bei fehlenden Pflichtfeldern */
+  .pf-invalid { border-color:rgba(255,80,80,0.7) !important; }
+  .pf-file-display.pf-invalid { border-color:rgba(255,80,80,0.7) !important; }
+
+  /* Loading state for submit */
+  .btn.is-loading .text-style-tagline { opacity:0; }
+  .btn.is-loading .btn-background::after {
+    content:''; position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    width:1.25rem; height:1.25rem;
+    border:2px solid rgba(10,25,60,0.3);
+    border-top-color:#0a193c;
+    border-radius:50%;
+    animation:pf-spin 600ms linear infinite;
+  }
+  @keyframes pf-spin { to { transform:rotate(360deg); } }
+
+  /* Messages */
+  .pf-msg { display:none; width:100%; padding:1rem; border-radius:var(--radius--small, 0.25rem); font-size:0.85rem; line-height:150%; }
+  .pf-msg.is-success { display:block; background:rgba(85,236,130,0.15); color:var(--colors--green, #55ec82); }
+  .pf-msg.is-error { display:block; background:rgba(255,80,80,0.15); color:#ff5050; }
+</style>
+
+<!-- Upload icon SVG -->
+<svg style="display:none">
+  <symbol id="pf-icon-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+    <line x1="12" y1="18" x2="12" y2="12"></line>
+    <polyline points="9 15 12 12 15 15"></polyline>
+  </symbol>
+</svg>
+
+<div class="form w-form">
+  <form class="form-wrapper" id="pf-apply-form" novalidate>
+
+    <!-- Personio Job ID (hidden, dynamisch aus CMS via "Add Field") -->
+    <input type="hidden" name="job_position_id" value="PERSONIO_ID_FELD">
+
+    <!-- Vorname / Nachname -->
+    <div class="input-double">
+      <div class="input-wrap">
+        <input class="input-field w-input" type="text" name="first_name" placeholder="Vorname" required>
+      </div>
+      <div class="input-wrap">
+        <input class="input-field w-input" type="text" name="last_name" placeholder="Nachname" required>
+      </div>
+    </div>
+
+    <!-- E-Mail -->
+    <div class="input-wrap">
+      <input class="input-field w-input" type="email" name="email" placeholder="E-Mail Adresse" required>
+    </div>
+
+    <!-- Telefon -->
+    <div class="input-wrap">
+      <input class="input-field w-input" type="tel" name="phone" placeholder="Telefonnummer">
+    </div>
+
+    <!-- CV / Anschreiben -->
+    <div class="input-double">
+      <div class="pf-file">
+        <div class="pf-file-display">
+          <span class="pf-file-text">Lebenslauf / CV</span>
+          <svg class="pf-file-icon"><use href="#pf-icon-upload"/></svg>
+        </div>
+        <input type="file" name="upload_cv" accept=".pdf,.doc,.docx,.odt,.rtf,.jpg,.jpeg,.png" required>
+      </div>
+      <div class="pf-file">
+        <div class="pf-file-display">
+          <span class="pf-file-text">Anschreiben</span>
+          <svg class="pf-file-icon"><use href="#pf-icon-upload"/></svg>
+        </div>
+        <input type="file" name="upload_cover_letter" accept=".pdf,.doc,.docx,.odt,.rtf,.jpg,.jpeg,.png">
+      </div>
+    </div>
+
+    <!-- Weitere Unterlagen -->
+    <div class="pf-file">
+      <div class="pf-file-display">
+        <span class="pf-file-text">Weitere Unterlagen</span>
+        <svg class="pf-file-icon"><use href="#pf-icon-upload"/></svg>
+      </div>
+      <input type="file" name="upload_other" accept=".pdf,.doc,.docx,.odt,.rtf,.jpg,.jpeg,.png,.zip,.7z,.rar" multiple>
+    </div>
+
+    <!-- Recruiting Channel -->
+    <div class="input-wrap">
+      <select class="input-field is-select w-select" name="referer" id="pf-referer" required>
+        <option value="">Wie bist du auf die Job-Anzeige aufmerksam geworden?</option>
+        <option value="Karriere.at">Karriere.at</option>
+        <option value="stepstone">stepstone</option>
+        <option value="LinkedIn">LinkedIn</option>
+        <option value="PÜSPÖK Homepage">PÜSPÖK Homepage</option>
+        <option value="PÜSPÖK Mitarbeiter*in">PÜSPÖK Mitarbeiter*in</option>
+        <option value="IG Windkraft">IG Windkraft</option>
+        <option value="PV Austria">PV Austria</option>
+        <option value="TU Career Center">TU Career Center</option>
+        <option value="Facebook">Facebook</option>
+        <option value="Print">Print</option>
+        <option value="Newsletter">Newsletter</option>
+        <option value="Sonstige Jobbörse">Sonstige Jobbörse</option>
+        <option value="Sonstiges">Sonstiges</option>
+      </select>
+    </div>
+
+    <!-- Conditional: Sonstige Jobbörse -->
+    <div class="pf-conditional" id="pf-referer-other">
+      <div class="input-wrap">
+        <input class="input-field w-input" type="text" name="referer_other" placeholder="Über wen / welche Plattform?">
+      </div>
+    </div>
+
+    <!-- Conditional: Mitarbeiter*in -->
+    <div class="pf-conditional" id="pf-referer-person">
+      <div class="input-wrap">
+        <input class="input-field w-input" type="text" name="referer_person" placeholder="Über wen?">
+      </div>
+    </div>
+
+    <!-- Bottom: Toggle + Button -->
+    <div class="form-spreader">
+      <label class="w-checkbox checkbox-toggle-field">
+        <div class="w-checkbox-input w-checkbox-input--inputType-custom checkbox-toggle" id="pf-toggle-visual"></div>
+        <input type="checkbox" name="privacy_policy" id="pf-privacy" data-name="privacy_policy" style="opacity:0;position:absolute;z-index:-1" required>
+        <span class="text-style-tiny w-form-label">Ich nehme die <a href="/datenschutz" target="_blank">Datenschutzbestimmung</a> zur Kenntnis.</span>
+      </label>
+      <div class="btn btn-animate-chars" id="pf-submit-btn">
+        <div data-button-animate-chars="" class="text-style-tagline">Bewerben</div>
+        <div class="btn-background"></div>
+        <input type="submit" data-wait="" class="hidden-submit w-button" value="">
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="pf-msg" id="pf-success">
+      Vielen Dank für deine Bewerbung! Wir melden uns in Kürze bei dir.
+    </div>
+    <div class="pf-msg" id="pf-error"></div>
+  </form>
+</div>
+
+<script>
+(function() {
+  const WORKER_URL = 'https://personio-webflow-sync.puespoek.workers.dev';
+
+  // File inputs
+  document.querySelectorAll('.pf-file').forEach(zone => {
+    const input = zone.querySelector('input[type="file"]');
+    const textEl = zone.querySelector('.pf-file-text');
+    const defaultText = textEl.textContent;
+
+    input.addEventListener('change', () => {
+      if (input.files.length > 0) {
+        textEl.textContent = Array.from(input.files).map(f => f.name).join(', ');
+        textEl.classList.add('has-file');
+      } else {
+        textEl.textContent = defaultText;
+        textEl.classList.remove('has-file');
+      }
+    });
+
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('is-dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('is-dragover'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('is-dragover');
+      input.files = e.dataTransfer.files;
+      input.dispatchEvent(new Event('change'));
+    });
+  });
+
+  // Conditional referer fields
+  const referer = document.getElementById('pf-referer');
+  const otherField = document.getElementById('pf-referer-other');
+  const personField = document.getElementById('pf-referer-person');
+
+  referer.addEventListener('change', () => {
+    otherField.classList.toggle('is-visible', referer.value === 'Sonstige Jobbörse');
+    personField.classList.toggle('is-visible', referer.value === 'PÜSPÖK Mitarbeiter*in');
+  });
+
+  // Toggle checkbox visual state
+  const privacyInput = document.getElementById('pf-privacy');
+  const toggleVisual = document.getElementById('pf-toggle-visual');
+  privacyInput.addEventListener('change', () => {
+    toggleVisual.classList.toggle('w--redirected-checked', privacyInput.checked);
+  });
+
+  // Clear validation on input
+  document.querySelectorAll('#pf-apply-form .input-field, #pf-apply-form .pf-file-display').forEach(el => {
+    const event = el.classList.contains('pf-file-display') ? null : 'input';
+    if (event) el.addEventListener(event, () => el.classList.remove('pf-invalid'));
+  });
+  document.querySelectorAll('#pf-apply-form .pf-file input[type="file"]').forEach(input => {
+    input.addEventListener('change', () => {
+      input.closest('.pf-file').querySelector('.pf-file-display').classList.remove('pf-invalid');
+    });
+  });
+
+  // Form submit
+  const form = document.getElementById('pf-apply-form');
+  const btn = document.getElementById('pf-submit-btn');
+  const successMsg = document.getElementById('pf-success');
+  const errorMsg = document.getElementById('pf-error');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    successMsg.className = 'pf-msg';
+    errorMsg.className = 'pf-msg';
+
+    // Clear previous validation
+    form.querySelectorAll('.pf-invalid').forEach(el => el.classList.remove('pf-invalid'));
+
+    // Validate required fields
+    let valid = true;
+    form.querySelectorAll('[required]').forEach(input => {
+      const isEmpty = input.type === 'checkbox' ? !input.checked
+        : input.type === 'file' ? !input.files.length
+        : !input.value.trim();
+      if (isEmpty) {
+        valid = false;
+        if (input.type === 'file') {
+          input.closest('.pf-file').querySelector('.pf-file-display').classList.add('pf-invalid');
+        } else if (input.type === 'checkbox') {
+          // toggle gets visual feedback via toggle-track
+        } else {
+          input.classList.add('pf-invalid');
+        }
+      }
+    });
+    // Email format
+    const emailInput = form.querySelector('[name="email"]');
+    if (emailInput.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value)) {
+      emailInput.classList.add('pf-invalid');
+      valid = false;
+    }
+    if (!valid) {
+      errorMsg.textContent = 'Bitte fülle alle Pflichtfelder aus.';
+      errorMsg.className = 'pf-msg is-error';
+      return;
+    }
+
+    let totalSize = 0;
+    form.querySelectorAll('input[type="file"]').forEach(input => {
+      Array.from(input.files || []).forEach(f => totalSize += f.size);
+    });
+    if (totalSize > 20 * 1024 * 1024) {
+      errorMsg.textContent = 'Die Dateien sind insgesamt zu groß (max. 20 MB).';
+      errorMsg.className = 'pf-msg is-error';
+      return;
+    }
+
+    btn.classList.add('is-loading');
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(WORKER_URL + '/apply', {
+        method: 'POST',
+        body: new FormData(form),
+      });
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        form.style.display = 'none';
+        successMsg.className = 'pf-msg is-success';
+      } else {
+        errorMsg.textContent = result.error || 'Beim Absenden ist ein Fehler aufgetreten.';
+        errorMsg.className = 'pf-msg is-error';
+      }
+    } catch (err) {
+      errorMsg.textContent = 'Netzwerkfehler. Bitte versuche es erneut.';
+      errorMsg.className = 'pf-msg is-error';
+    } finally {
+      btn.classList.remove('is-loading');
+      btn.disabled = false;
+    }
+  });
+})();
+</script>

@@ -407,6 +407,159 @@ async function syncJobs(env) {
   return summary;
 }
 
+// --------------- Personio Recruiting API ---------------
+
+const PERSONIO_API_BASE = "https://api.personio.de/v1/recruiting";
+
+async function uploadDocumentToPersonio(env, file, category) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("category", category);
+
+  const res = await fetch(`${PERSONIO_API_BASE}/applications/documents`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.PERSONIO_RECRUITING_TOKEN}`,
+      "X-Company-ID": env.PERSONIO_COMPANY_ID,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Personio document upload failed: ${res.status} – ${errText}`);
+  }
+
+  const data = await res.json();
+  return data.data; // { uuid, original_filename, ... }
+}
+
+async function createPersonioApplication(env, applicationData) {
+  const res = await fetch(`${PERSONIO_API_BASE}/applications`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.PERSONIO_RECRUITING_TOKEN}`,
+      "X-Company-ID": env.PERSONIO_COMPANY_ID,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(applicationData),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Personio application failed: ${res.status} – ${errText}`);
+  }
+
+  return res.json();
+}
+
+async function handleApplication(request, env) {
+  // CORS preflight
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders() });
+  }
+
+  try {
+    const formData = await request.formData();
+
+    // Required fields
+    const firstName = formData.get("first_name");
+    const lastName = formData.get("last_name");
+    const email = formData.get("email");
+    const jobPositionId = formData.get("job_position_id");
+
+    if (!firstName || !lastName || !email || !jobPositionId) {
+      return jsonResponse({ success: false, error: "Pflichtfelder fehlen." }, 400);
+    }
+
+    // Upload files
+    const files = [];
+
+    const cv = formData.get("upload_cv");
+    if (cv && cv.size > 0) {
+      const result = await uploadDocumentToPersonio(env, cv, "cv");
+      files.push({ uuid: result.uuid, original_filename: result.original_filename, category: "cv" });
+    }
+
+    const coverLetter = formData.get("upload_cover_letter");
+    if (coverLetter && coverLetter.size > 0) {
+      const result = await uploadDocumentToPersonio(env, coverLetter, "cover-letter");
+      files.push({ uuid: result.uuid, original_filename: result.original_filename, category: "cover-letter" });
+    }
+
+    const otherFiles = formData.getAll("upload_other");
+    for (const file of otherFiles) {
+      if (file && file.size > 0) {
+        const result = await uploadDocumentToPersonio(env, file, "other");
+        files.push({ uuid: result.uuid, original_filename: result.original_filename, category: "other" });
+      }
+    }
+
+    // Build application
+    const application = {
+      first_name: firstName,
+      last_name: lastName,
+      email: email,
+      job_position_id: parseInt(jobPositionId, 10),
+    };
+
+    if (files.length > 0) {
+      application.files = files;
+    }
+
+    // Optional attributes
+    const attributes = [];
+    const phone = formData.get("phone");
+    if (phone) attributes.push({ id: "phone", value: phone });
+    const gender = formData.get("gender");
+    if (gender) attributes.push({ id: "gender", value: gender });
+    const availableFrom = formData.get("available_from");
+    if (availableFrom) attributes.push({ id: "available_from", value: availableFrom });
+    const salary = formData.get("salary_expectations");
+    if (salary) attributes.push({ id: "salary_expectations", value: salary });
+    if (attributes.length > 0) {
+      application.attributes = attributes;
+    }
+
+    // Recruiting channel (message field as workaround)
+    const referer = formData.get("referer");
+    const refererOther = formData.get("referer_other");
+    const refererPerson = formData.get("referer_person");
+    if (referer) {
+      let channel = referer;
+      if (referer === "Sonstige Jobbörse" && refererOther) channel += `: ${refererOther}`;
+      if (referer === "PÜSPÖK Mitarbeiter*in" && refererPerson) channel += `: ${refererPerson}`;
+      application.message = `Recruiting-Kanal: ${channel}`;
+    }
+
+    // Submit to Personio
+    const result = await createPersonioApplication(env, application);
+
+    return jsonResponse({ success: true, id: result.data?.id });
+  } catch (err) {
+    console.error("Application error:", err.message);
+    return jsonResponse({ success: false, error: "Bewerbung konnte nicht gesendet werden. Bitte versuche es erneut." }, 500);
+  }
+}
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+
+function jsonResponse(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders(),
+    },
+  });
+}
+
 // --------------- Worker Entry Points ---------------
 
 export default {
@@ -422,6 +575,11 @@ export default {
   // HTTP Handler (manual sync + status)
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // POST /apply → Bewerbung an Personio weiterleiten
+    if (url.pathname === "/apply" && (request.method === "POST" || request.method === "OPTIONS")) {
+      return handleApplication(request, env);
+    }
 
     // POST /sync → manuellen Sync auslösen
     if (url.pathname === "/sync" && request.method === "POST") {
@@ -464,6 +622,7 @@ export default {
         endpoints: {
           "POST /sync": "Manuellen Sync ausfuehren",
           "GET /preview": "Personio-Daten als JSON ansehen (kein Push)",
+          "POST /apply": "Bewerbung an Personio weiterleiten",
         },
         cron: "Alle 6 Stunden automatisch",
       }, null, 2),
