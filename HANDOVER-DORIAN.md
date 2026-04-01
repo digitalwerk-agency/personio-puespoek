@@ -174,6 +174,72 @@ Webflow API Token: In Webflow → Workspace Settings → Integrations → API Ac
 
 ---
 
+## Bewerbungsformular
+
+Das Bewerbungsformular ist als **Custom HTML Embed** in der Webflow Job-Detailseite eingebaut. Es nutzt die bestehenden Webflow CSS-Klassen (`input-field`, `btn`, `checkbox-toggle`, etc.) und hat eigenes CSS nur für die File-Uploads.
+
+### Wie es funktioniert
+
+```
+Webflow Formular          Cloudflare Worker          Personio Recruiting API
+(HTML Embed)              POST /apply                POST /applications
+
+  Bewerber füllt aus          │                           │
+  → Name, Email, CV           │                           │
+  → Klickt "Bewerben"         │                           │
+       │                      │                           │
+       │   FormData senden    │                           │
+       │─────────────────────►│                           │
+       │                      │   1. Dateien hochladen    │
+       │                      │──────────────────────────►│
+       │                      │   ◄── UUIDs zurück        │
+       │                      │                           │
+       │                      │   2. Bewerbung erstellen  │
+       │                      │──────────────────────────►│
+       │                      │   ◄── Erfolg/Fehler       │
+       │   ◄── JSON Response  │                           │
+       │                      │                           │
+  Erfolgsmeldung anzeigen     │                           │
+```
+
+### Formular-Felder
+
+| Feld | Typ | Pflicht |
+|------|-----|---------|
+| Vorname | Text | Ja |
+| Nachname | Text | Ja |
+| E-Mail | Email | Ja |
+| Telefon | Tel | Nein |
+| Lebenslauf / CV | File Upload | Ja |
+| Anschreiben | File Upload | Nein |
+| Weitere Unterlagen | File Upload (mehrere) | Nein |
+| Recruiting-Kanal | Dropdown (13 Optionen) | Ja |
+| Datenschutz-Toggle | Checkbox | Ja |
+
+### Einrichtung in Webflow
+
+1. Job-Detailseite im Designer öffnen
+2. **Embed-Element** einfügen wo das Formular hin soll
+3. HTML aus `webflow-embed-snippets/bewerbungsformular.html` reinkopieren
+4. Den Platzhalter `PERSONIO_ID_FELD` im Hidden Input über **"Add Field" → Personio ID** ersetzen
+
+### Secrets für den /apply Endpoint
+
+```bash
+npx wrangler secret put PERSONIO_RECRUITING_TOKEN
+npx wrangler secret put PERSONIO_COMPANY_ID
+```
+
+Token & Company ID: Personio → Einstellungen → Integrationen → API-Zugriffsdaten → Recruiting API
+
+### Dateien
+
+- `webflow-embed-snippets/bewerbungsformular.html` – Formular HTML + CSS + JS
+- `webflow-embed-snippets/bewerbungsformular-spec.md` – Feld-Spezifikation
+- `webflow-embed-snippets/email-angelika-api-token.md` – E-Mail-Vorlage für API-Token-Anfrage
+
+---
+
 ## Deployment
 
 Der Worker wird **automatisch deployed** bei jedem Push auf `main` via Cloudflare Git Integration.
@@ -196,9 +262,13 @@ npx wrangler deploy
 personio-puespoek/
 ├── personio-sync/
 │   ├── src/
-│   │   └── worker.js        # Haupt-Script (alles in einer Datei)
-│   ├── wrangler.toml         # Worker-Config & Cron
+│   │   └── worker.js              # Worker: Sync + Bewerbungs-Endpoint
+│   ├── wrangler.toml               # Worker-Config & Cron
 │   └── package.json
-├── CLAUDE.md                 # Projekt-Kontext für Claude Code
-└── HANDOVER-DORIAN.md        # Diese Datei
+├── webflow-embed-snippets/
+│   ├── bewerbungsformular.html     # Formular HTML/CSS/JS für Webflow Embed
+│   ├── bewerbungsformular-spec.md  # Feld-Spezifikation
+│   └── email-angelika-api-token.md # E-Mail-Vorlage für Token-Anfrage
+├── CLAUDE.md                       # Projekt-Kontext für Claude Code
+└── HANDOVER-DORIAN.md              # Diese Datei
 ```
