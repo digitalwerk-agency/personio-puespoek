@@ -174,12 +174,18 @@ Webflow API Token: In Webflow → Workspace Settings → Integrations → API Ac
 
 ---
 
-## Neu deployen
+## Deployment
+
+Der Worker wird **automatisch deployed** bei jedem Push auf `main` via Cloudflare Git Integration.
 
 ```bash
+# Code ändern, committen, pushen → Auto-Deploy
+git add . && git commit -m "Beschreibung" && git push
+
+# Manuelles Deploy (nur falls nötig)
 cd personio-sync
-npx wrangler login       # falls nicht eingeloggt
-npx wrangler deploy      # Worker deployen
+npx wrangler login
+npx wrangler deploy
 ```
 
 ---
