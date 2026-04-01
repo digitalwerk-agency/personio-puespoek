@@ -131,16 +131,42 @@ function getSalaryInfo(xml) {
 
 // --------------- Data Transformation ---------------
 
+function cleanHtmlForWebflow(html) {
+  // Webflow RichText unterstützt nur: h1-h6, p, ul, ol, li, a, strong, em, blockquote, figure, img
+  // Alles andere muss raus oder konvertiert werden.
+  return html
+    // LinkedIn Tags entfernen
+    .replace(/<strong>?\s*<em>\s*<span[^>]*>#LI-DNI<\/span>\s*<\/em>\s*<\/strong>?\s*/g, "")
+    .replace(/#LI-DNI/g, "")
+    // Inline-Styles entfernen
+    .replace(/\s*style="[^"]*"/g, "")
+    // <span> Tags entfernen (Inhalt behalten)
+    .replace(/<\/?span[^>]*>/g, "")
+    // <div> → <p>
+    .replace(/<div[^>]*>/g, "<p>")
+    .replace(/<\/div>/g, "</p>")
+    // <br><br> → Absatzwechsel
+    .replace(/<br\s*\/?>\s*<br\s*\/?>/g, "</p><p>")
+    // Einzelne <br> behalten (Webflow kann das)
+    // Leere Tags entfernen
+    .replace(/<(p|li|ul|ol|strong|em)>\s*<\/\1>/g, "")
+    // Verschachtelte <strong>/<em> aufräumen
+    .replace(/<strong>\s*<strong>/g, "<strong>")
+    .replace(/<\/strong>\s*<\/strong>/g, "</strong>")
+    .replace(/<em>\s*<em>/g, "<em>")
+    .replace(/<\/em>\s*<\/em>/g, "</em>")
+    // Mehrfache Leerzeilen/Whitespace komprimieren
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function buildRichTextDescription(jobDescriptions) {
   // Baut aus den einzelnen jobDescription-Bloecken ein zusammenhaengendes
   // RichText-HTML fuer Webflow
-  return jobDescriptions
+  const raw = jobDescriptions
     .map((desc) => `<h3>${desc.name}</h3>\n${desc.value}`)
-    .join("\n")
-    .replace(/<strong>?\s*<em>\s*<span[^>]*>#LI-DNI<\/span>\s*<\/em>\s*<\/strong>?\s*/g, "")
-    .replace(/#LI-DNI/g, "")
-    .replace(/\s*style="[^"]*"/g, "")
-    .replace(/<span>([\s\S]*?)<\/span>/g, "$1");
+    .join("\n");
+  return cleanHtmlForWebflow(raw);
 }
 
 function buildAllLocations(office, additionalOffices) {
