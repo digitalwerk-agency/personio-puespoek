@@ -66,10 +66,19 @@ function parseXML(xmlText) {
   return jobs;
 }
 
+function decodeEntities(text) {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
 function getTag(xml, tag) {
   const regex = new RegExp(`<${tag}>([^<]*)</${tag}>`);
   const match = xml.match(regex);
-  return match ? match[1].trim() : "";
+  return match ? decodeEntities(match[1].trim()) : "";
 }
 
 function getAdditionalOffices(xml) {
