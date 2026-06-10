@@ -62,7 +62,9 @@
   </symbol>
 </svg>
 
-<div class="form w-form">
+<!-- Kein "w-form": sonst haengt sich webflow.js mit eigener Validierung
+     (englische Alerts) und eigenem Submit an das Formular -->
+<div class="form">
   <form class="form-wrapper" id="pf-apply-form" novalidate>
 
     <!-- Personio Job ID (hidden, dynamisch aus CMS via "Add Field") -->
