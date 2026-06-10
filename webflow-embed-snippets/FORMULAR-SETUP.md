@@ -117,7 +117,7 @@ Der Token läuft **nicht ab** (statisch, bis manuell zurückgesetzt).
 
 ```bash
 # Sollte den /apply Endpoint listen
-curl https://personio-webflow-sync.puespoek.workers.dev
+curl https://personio-webflow-sync.achtzehngrad.workers.dev
 ```
 
 ### 2. Testbewerbung senden

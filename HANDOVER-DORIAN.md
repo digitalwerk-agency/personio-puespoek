@@ -4,10 +4,10 @@
 
 Der Sync ist deployed und läuft automatisch alle 6 Stunden.
 
-- **Worker URL:** `https://personio-webflow-sync.puespoek.workers.dev`
-- **Cloudflare Account:** Raphael (puespoek.workers.dev)
-- **Webflow Site:** PÜSPÖK (digitalwerk-agency Workspace)
-- **Collection:** Jobs (ID: `69c396e5be115a97f09524f8`, Slug: `offene-stellen`)
+- **Worker URL:** `https://personio-webflow-sync.achtzehngrad.workers.dev`
+- **Cloudflare Account:** Raphael, office@achtzehngrad.at (achtzehngrad.workers.dev)
+- **Webflow Site:** PÜSPÖK (migriert, Staging: `https://puespoek-staging.webflow.io`)
+- **Collection:** Jobs (ID: `69e8c53f49395a3e534bf834`, Slug: `offene-stellen`)
 
 ---
 
@@ -18,7 +18,7 @@ Personio XML Feed          Cloudflare Worker           Webflow CMS
 (alle offenen Stellen)     (alle 6h via Cron)          (Collection "Jobs")
 
 puespoek.jobs.personio     personio-webflow-sync       CMS Items mit
-  .com/xml                   .puespoek.workers.dev       personio-id
+  .com/xml                   .achtzehngrad.workers.dev       personio-id
        │                            │                         │
        │   1. XML abrufen           │                         │
        │◄───────────────────────────│                         │
@@ -112,7 +112,7 @@ Englische Personio-Werte werden automatisch übersetzt:
 ### Manueller Sync
 
 ```bash
-curl -X POST https://personio-webflow-sync.puespoek.workers.dev/sync
+curl -X POST https://personio-webflow-sync.achtzehngrad.workers.dev/sync
 ```
 
 ---
@@ -160,7 +160,7 @@ npx wrangler secret put WEBFLOW_API_TOKEN
 npx wrangler secret put WEBFLOW_COLLECTION_ID
 ```
 
-Collection ID: `69c396e5be115a97f09524f8`
+Collection ID: `69e8c53f49395a3e534bf834`
 
 Webflow API Token: In Webflow → Workspace Settings → Integrations → API Access generieren (CMS Read/Write Rechte).
 

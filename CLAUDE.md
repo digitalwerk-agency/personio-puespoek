@@ -7,8 +7,8 @@ into a Webflow CMS Collection via a Cloudflare Worker.
 
 ## Status: LIVE
 
-- **Worker:** `https://personio-webflow-sync.puespoek.workers.dev`
-- **Cloudflare Account:** puespoek.workers.dev
+- **Worker:** `https://personio-webflow-sync.achtzehngrad.workers.dev`
+- **Cloudflare Account:** office@achtzehngrad.at (achtzehngrad.workers.dev)
 - **Deployment:** Auto-deploy via Cloudflare Git integration (push to main)
 
 ## Key Files
@@ -20,7 +20,7 @@ into a Webflow CMS Collection via a Cloudflare Worker.
 ## Architecture
 
 - **Source:** Personio XML feed at `https://puespoek.jobs.personio.com/xml`
-- **Target:** Webflow CMS Collection "Jobs" (ID: `69c396e5be115a97f09524f8`, Slug: `offene-stellen`)
+- **Target:** Webflow CMS Collection "Jobs" (ID: `69e8c53f49395a3e534bf834`, Slug: `offene-stellen`)
 - **Runtime:** Cloudflare Worker (Free Plan)
 - **Schedule:** Cron every 6 hours
 - **Sync key:** `personio-id` field links Personio positions to Webflow CMS items

@@ -246,7 +246,9 @@ async function webflowRequest(env, method, path, body) {
     const errorText = await res.text();
     throw new Error(`Webflow API ${method} ${path}: ${res.status} – ${errorText}`);
   }
-  return res.json();
+  // DELETE antwortet mit 204 No Content – kein JSON-Body
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function getAllCmsItems(env) {
@@ -287,6 +289,18 @@ async function updateItem(env, itemId, fieldData) {
 }
 
 async function deleteItem(env, itemId) {
+  // Erst die Live-Version loeschen, sonst bleibt das Item bis zum
+  // naechsten Site-Publish als Waise auf der Website sichtbar.
+  try {
+    await webflowRequest(
+      env,
+      "DELETE",
+      `/collections/${env.WEBFLOW_COLLECTION_ID}/items/${itemId}/live`
+    );
+  } catch (err) {
+    // 404 = Item war nie published – ignorieren
+    if (!err.message.includes("404")) throw err;
+  }
   return webflowRequest(
     env,
     "DELETE",
