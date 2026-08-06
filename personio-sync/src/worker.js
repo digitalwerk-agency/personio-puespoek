@@ -140,6 +140,12 @@ function cleanHtmlForWebflow(html) {
     .replace(/#LI-DNI/g, "")
     // Inline-Styles entfernen
     .replace(/\s*style="[^"]*"/g, "")
+    // Alte/abweichende Tags normalisieren
+    .replace(/<(\/?)b>/gi, "<$1strong>")
+    .replace(/<(\/?)i>/gi, "<$1em>")
+    // Alle Überschriften aus Personio auf h3 ziehen (kein h1/h2 im Body)
+    .replace(/<h[1-6]([^>]*)>/gi, "<h3>")
+    .replace(/<\/h[1-6]>/gi, "</h3>")
     // <span> Tags entfernen (Inhalt behalten)
     .replace(/<\/?span[^>]*>/g, "")
     // <div> → <p>
@@ -155,6 +161,10 @@ function cleanHtmlForWebflow(html) {
     .replace(/<\/strong>\s*<\/strong>/g, "</strong>")
     .replace(/<em>\s*<em>/g, "<em>")
     .replace(/<\/em>\s*<\/em>/g, "</em>")
+    // Absatz, der komplett fett ist, ist in Wahrheit eine Überschrift → h3
+    .replace(/<p>\s*<strong>([\s\S]*?)<\/strong>\s*<\/p>/gi, "<h3>$1</h3>")
+    // Fettungen im Fließtext raus (laut CI kein Bold im Body)
+    .replace(/<\/?strong>/gi, "")
     // Mehrfache Leerzeilen/Whitespace komprimieren
     .replace(/\n{3,}/g, "\n\n")
     .trim();
