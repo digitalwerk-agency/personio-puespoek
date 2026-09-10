@@ -8,6 +8,8 @@ crons = ["0 */6 * * *"]
 
 [vars]
 PERSONIO_XML_URL = "https://puespoek.jobs.personio.com/xml"
+# Recruiting-Phase "Neu" fuer Bewerbungen ueber die Website (ID aus Personio > Einstellungen > Recruiting > Phasen)
+PERSONIO_PHASE_ID = "1526861"
 # WEBFLOW_COLLECTION_ID und WEBFLOW_API_TOKEN als Secrets setzen:
 # npx wrangler secret put WEBFLOW_API_TOKEN
 # npx wrangler secret put WEBFLOW_COLLECTION_ID

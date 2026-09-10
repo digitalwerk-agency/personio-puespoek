@@ -527,6 +527,12 @@ async function handleApplication(request, env) {
       job_position_id: parseInt(jobPositionId, 10),
     };
 
+    // Recruiting-Phase "Neu" setzen (Kundenwunsch 09/2026, Phase-ID laut Personio-Support).
+    // Ohne Phase landen API-Bewerbungen in "unassigned" und werden nicht zugewiesen.
+    if (env.PERSONIO_PHASE_ID) {
+      application.phase = { type: "custom", id: parseInt(env.PERSONIO_PHASE_ID, 10) };
+    }
+
     if (files.length > 0) {
       application.files = files;
     }
