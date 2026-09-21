@@ -477,14 +477,100 @@ async function createPersonioApplication(env, applicationData) {
   return res.json();
 }
 
+// --------------- Spam-Schutz /apply ---------------
+// Reihenfolge: Origin → Rate-Limit → Honeypot → Turnstile → Dateigroesse.
+// Alles laeuft VOR den Uploads, damit Spam Personio nie erreicht.
+// Turnstile greift erst, wenn das Secret TURNSTILE_SECRET_KEY gesetzt ist
+// (so kann der Worker vor dem neuen Formular-Embed deployt werden).
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // wie im Formular-JS
+const HONEYPOT_FIELD = "website";
+
+function allowedOrigins(env) {
+  return (env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+}
+
+function isAllowedOrigin(request, env) {
+  const list = allowedOrigins(env);
+  if (list.length === 0) return true; // nicht konfiguriert → kein Check
+  return list.includes(request.headers.get("Origin"));
+}
+
+async function verifyTurnstile(env, token, ip) {
+  if (!token) return false;
+  const body = new FormData();
+  body.append("secret", env.TURNSTILE_SECRET_KEY);
+  body.append("response", token);
+  if (ip) body.append("remoteip", ip);
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body,
+    });
+    const data = await res.json();
+    if (!data.success) console.warn("Turnstile rejected:", JSON.stringify(data["error-codes"]));
+    return data.success === true;
+  } catch (err) {
+    console.error("Turnstile verify error:", err.message);
+    return false;
+  }
+}
+
+function totalUploadSize(formData) {
+  let total = 0;
+  for (const value of formData.values()) {
+    if (value && typeof value === "object" && typeof value.size === "number") total += value.size;
+  }
+  return total;
+}
+
 async function handleApplication(request, env) {
+  const origin = request.headers.get("Origin");
+
+  if (!isAllowedOrigin(request, env)) {
+    console.warn("Blocked origin:", origin);
+    return jsonResponse({ success: false, error: "Nicht erlaubt." }, 403, origin, env);
+  }
+
   // CORS preflight
   if (request.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders() });
+    return new Response(null, { headers: corsHeaders(origin, env) });
+  }
+
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+
+  // Optionales Rate-Limit (Binding APPLY_LIMITER in wrangler.toml)
+  if (env.APPLY_LIMITER && ip) {
+    const { success } = await env.APPLY_LIMITER.limit({ key: ip });
+    if (!success) {
+      console.warn("Rate limit hit:", ip);
+      return jsonResponse({ success: false, error: "Zu viele Anfragen. Bitte versuche es in ein paar Minuten erneut." }, 429, origin, env);
+    }
   }
 
   try {
     const formData = await request.formData();
+
+    // Honeypot: Menschen sehen das Feld nicht. Bots bekommen ein falsches
+    // "success", damit sie nicht merken, dass sie aussortiert wurden.
+    if (formData.get(HONEYPOT_FIELD)) {
+      console.warn("Honeypot filled, dropped. IP:", ip);
+      return jsonResponse({ success: true }, 200, origin, env);
+    }
+
+    if (env.TURNSTILE_SECRET_KEY) {
+      const ok = await verifyTurnstile(env, formData.get("cf-turnstile-response"), ip);
+      if (!ok) {
+        return jsonResponse({ success: false, error: "Die Sicherheitsprüfung ist fehlgeschlagen. Bitte lade die Seite neu und versuche es noch einmal." }, 403, origin, env);
+      }
+    }
+
+    if (totalUploadSize(formData) > MAX_UPLOAD_BYTES) {
+      return jsonResponse({ success: false, error: "Die Dateien sind insgesamt zu groß (max. 20 MB)." }, 413, origin, env);
+    }
 
     // Required fields
     const firstName = formData.get("first_name");
@@ -493,7 +579,7 @@ async function handleApplication(request, env) {
     const jobPositionId = formData.get("job_position_id");
 
     if (!firstName || !lastName || !email || !jobPositionId) {
-      return jsonResponse({ success: false, error: "Pflichtfelder fehlen." }, 400);
+      return jsonResponse({ success: false, error: "Pflichtfelder fehlen." }, 400, origin, env);
     }
 
     // Upload files
@@ -565,27 +651,31 @@ async function handleApplication(request, env) {
     // Submit to Personio
     const result = await createPersonioApplication(env, application);
 
-    return jsonResponse({ success: true, id: result.data?.id });
+    return jsonResponse({ success: true, id: result.data?.id }, 200, origin, env);
   } catch (err) {
     console.error("Application error:", err.message);
-    return jsonResponse({ success: false, error: "Bewerbung konnte nicht gesendet werden. Bitte versuche es erneut." }, 500);
+    return jsonResponse({ success: false, error: "Bewerbung konnte nicht gesendet werden. Bitte versuche es erneut." }, 500, origin, env);
   }
 }
 
-function corsHeaders() {
+function corsHeaders(origin, env) {
+  // Nur erlaubte Origins zurueckspiegeln; ohne ALLOWED_ORIGINS wie bisher "*"
+  const list = allowedOrigins(env);
+  const allow = list.length === 0 ? "*" : list.includes(origin) ? origin : list[0];
   return {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
+    Vary: "Origin",
   };
 }
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status, origin, env) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
-      ...corsHeaders(),
+      ...corsHeaders(origin, env),
     },
   });
 }

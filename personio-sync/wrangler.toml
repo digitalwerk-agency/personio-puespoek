@@ -10,6 +10,18 @@ crons = ["0 */6 * * *"]
 PERSONIO_XML_URL = "https://puespoek.jobs.personio.com/xml"
 # Recruiting-Phase "Neu" fuer Bewerbungen ueber die Website (ID aus Personio > Einstellungen > Recruiting > Phasen)
 PERSONIO_PHASE_ID = "1526861"
+# Spam-Schutz /apply: nur Bewerbungen von diesen Seiten annehmen (kommagetrennt, exakt wie der Browser-Origin)
+ALLOWED_ORIGINS = "https://www.puespoek.at,https://puespoek.at,https://puespoek-staging.webflow.io"
+# Turnstile-Pruefung aktiv, sobald das Secret gesetzt ist (erst NACH dem neuen Formular-Embed!):
+# npx wrangler secret put TURNSTILE_SECRET_KEY
+
+# Optional: Rate-Limit 5 Bewerbungen pro IP und Minute (Workers Rate Limiting).
+# Auskommentiert gelassen, damit der erste Deploy am Go-Live-Tag kein neues Binding braucht.
+# [[unsafe.bindings]]
+# name = "APPLY_LIMITER"
+# type = "ratelimit"
+# namespace_id = "1001"
+# simple = { limit = 5, period = 60 }
 # WEBFLOW_COLLECTION_ID und WEBFLOW_API_TOKEN als Secrets setzen:
 # npx wrangler secret put WEBFLOW_API_TOKEN
 # npx wrangler secret put WEBFLOW_COLLECTION_ID

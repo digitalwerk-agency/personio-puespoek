@@ -50,6 +50,10 @@
   .pf-msg { display:none; width:100%; padding:1rem; border-radius:var(--radius--small, 0.25rem); font-size:0.85rem; line-height:150%; }
   .pf-msg.is-success { display:block; background:rgba(85,236,130,0.15); color:var(--colors--green, #55ec82); }
   .pf-msg.is-error { display:block; background:rgba(255,80,80,0.15); color:#ff5050; }
+
+  /* Spam-Schutz: Honeypot unsichtbar, Turnstile nur sichtbar wenn Cloudflare nachfragt */
+  .pf-hp { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+  .pf-turnstile { width:100%; }
 </style>
 
 <!-- Upload icon SVG -->
@@ -69,6 +73,11 @@
 
     <!-- Personio Job ID (hidden, dynamisch aus CMS via "Add Field") -->
     <input type="hidden" name="job_position_id" value="PERSONIO_ID_FELD">
+
+    <!-- Spam-Schutz: Honeypot. Bleibt bei Menschen leer, Bots fuellen es aus -->
+    <div class="pf-hp" aria-hidden="true">
+      <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+    </div>
 
     <!-- Vorname / Nachname -->
     <div class="input-double">
@@ -151,6 +160,9 @@
       </div>
     </div>
 
+    <!-- Spam-Schutz: Cloudflare Turnstile (legt das Feld cf-turnstile-response an) -->
+    <div class="pf-turnstile" id="pf-turnstile"></div>
+
     <!-- Bottom: Toggle + Button -->
     <div class="form-spreader">
       <label class="w-checkbox checkbox-toggle-field">
@@ -176,6 +188,22 @@
 <script>
 (function() {
   const WORKER_URL = 'https://personio-webflow-sync.achtzehngrad.workers.dev';
+  const TURNSTILE_SITE_KEY = 'TURNSTILE_SITE_KEY_HIER_EINTRAGEN';
+
+  // Turnstile: wird von api.js (Script-Tag unten) per onload aufgerufen
+  let tsWidget = null;
+  window.pfTurnstileReady = function() {
+    tsWidget = window.turnstile.render('#pf-turnstile', {
+      sitekey: TURNSTILE_SITE_KEY,
+      action: 'apply',
+      appearance: 'interaction-only',
+      theme: 'dark',
+      language: 'de',
+    });
+  };
+  function resetTurnstile() {
+    if (window.turnstile && tsWidget !== null) window.turnstile.reset(tsWidget);
+  }
 
   // File inputs
   document.querySelectorAll('.pf-file').forEach(zone => {
@@ -284,6 +312,13 @@
       return;
     }
 
+    // Turnstile noch nicht fertig (laeuft im Hintergrund, meist < 1 s)
+    if (window.turnstile && tsWidget !== null && !window.turnstile.getResponse(tsWidget)) {
+      errorMsg.textContent = 'Einen Moment bitte, die Sicherheitsprüfung läuft noch. Bitte gleich noch einmal auf „Bewerben" klicken.';
+      errorMsg.className = 'pf-msg is-error';
+      return;
+    }
+
     btn.classList.add('is-loading');
     btn.disabled = true;
 
@@ -295,15 +330,18 @@
       const result = await res.json();
 
       if (res.ok && result.success) {
-        form.style.display = 'none';
+        // Nicht das ganze <form> ausblenden, die Erfolgsmeldung steckt darin
+        Array.from(form.children).forEach(el => { if (el !== successMsg) el.style.display = 'none'; });
         successMsg.className = 'pf-msg is-success';
       } else {
         errorMsg.textContent = result.error || 'Beim Absenden ist ein Fehler aufgetreten.';
         errorMsg.className = 'pf-msg is-error';
+        resetTurnstile(); // Token gilt nur einmal, fuer den naechsten Versuch neu holen
       }
     } catch (err) {
       errorMsg.textContent = 'Netzwerkfehler. Bitte versuche es erneut.';
       errorMsg.className = 'pf-msg is-error';
+      resetTurnstile();
     } finally {
       btn.classList.remove('is-loading');
       btn.disabled = false;
@@ -311,3 +349,4 @@
   });
 })();
 </script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=pfTurnstileReady" async defer></script>
