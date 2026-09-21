@@ -208,14 +208,30 @@ function toSlug(text) {
     .substring(0, 100);
 }
 
-function personioJobToWebflowItem(job) {
+// Slug ohne Personio-ID. Nur wenn zwei Jobs im Feed denselben Titel haben,
+// bekommt jeder weitere die ID angehaengt, damit der Slug eindeutig bleibt.
+function buildJobSlugs(jobs) {
+  const used = new Set();
+  const slugs = {};
+  for (const job of jobs) {
+    let slug = toSlug(job.name);
+    if (!slug || used.has(slug)) {
+      slug = toSlug(`${job.name}-${job.personioId}`);
+    }
+    used.add(slug);
+    slugs[job.personioId] = slug;
+  }
+  return slugs;
+}
+
+function personioJobToWebflowItem(job, slug) {
   // Mapped ein Personio-Job auf Webflow CMS fieldData.
   // Die Feld-Slugs muessen mit der Webflow Collection uebereinstimmen.
   // Anpassen wenn die Collection andere Slugs hat!
   const location = job.office ? ` in ${job.office}` : "";
   return {
     name: job.name,
-    slug: toSlug(`${job.name}-${job.personioId}`),
+    slug: slug || toSlug(`${job.name}-${job.personioId}`),
     "meta-seo-title": `${job.name}${location} | PÜSPÖK Karriere`,
     "meta-seo-description": `Jetzt bewerben: ${job.name}${location}. Werde Teil von PÜSPÖK, Österreichs größtem privaten Erzeuger erneuerbarer Energie.`,
     "personio-id": job.personioId,
@@ -371,8 +387,9 @@ async function syncJobs(env) {
   const deleted = [];
 
   // 4. Neue und geaenderte Jobs
+  const jobSlugs = buildJobSlugs(personioJobs);
   for (const job of personioJobs) {
-    const fieldData = personioJobToWebflowItem(job);
+    const fieldData = personioJobToWebflowItem(job, jobSlugs[job.personioId]);
     const existing = existingByPersonioId[job.personioId];
 
     if (!existing) {
@@ -723,7 +740,8 @@ export default {
         const xmlResponse = await fetch(xmlUrl);
         const xmlText = await xmlResponse.text();
         const jobs = parseXML(xmlText);
-        const mapped = jobs.map(personioJobToWebflowItem);
+        const previewSlugs = buildJobSlugs(jobs);
+        const mapped = jobs.map((job) => personioJobToWebflowItem(job, previewSlugs[job.personioId]));
         return new Response(JSON.stringify(mapped, null, 2), {
           headers: { "Content-Type": "application/json" },
         });
