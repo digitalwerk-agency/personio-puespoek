@@ -499,7 +499,7 @@ async function createPersonioApplication(env, applicationData) {
 
   // Personio antwortet beim Anlegen mit 2xx und leerem Body. Leer = Erfolg.
   const text = await res.text();
-  console.log(`Personio application created: ${res.status}${text ? " " + text.slice(0, 200) : " (empty body)"}`);
+  console.log(`Personio application created: ${res.status}, channel ${applicationData.recruiting_channel_id || "-"}${text ? " " + text.slice(0, 200) : " (empty body)"}`);
   if (!text) return {};
   try {
     return JSON.parse(text);
@@ -516,6 +516,19 @@ async function createPersonioApplication(env, applicationData) {
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // wie im Formular-JS
 const HONEYPOT_FIELD = "website";
+
+// Formular-Option (referer) → Personio-Recruiting-Kanal (Kanal-ID der Recruiting-API).
+// Quelle: Screenshot PÜSPÖK HR, 22.09.2026. Optionen ohne passenden Kanal fehlen hier
+// bewusst und werden nur als Nachricht übertragen.
+const RECRUITING_CHANNEL_IDS = {
+  "Karriere.at": 1460772,
+  "LinkedIn": 1460775,
+  "PÜSPÖK Homepage": 1460774,
+  "PÜSPÖK Mitarbeiter*in": 1460773,
+  "Print": 1460776,
+  "TU Career Center": 1237154, // Universität Stellenbörse
+  "Facebook": 1237152, // Social Media
+};
 
 function allowedOrigins(env) {
   return (env.ALLOWED_ORIGINS || "")
@@ -677,10 +690,25 @@ async function handleApplication(request, env) {
       if (referer === "Sonstige Jobbörse" && refererOther) channel += `: ${refererOther}`;
       if (referer === "PÜSPÖK Mitarbeiter*in" && refererPerson) channel += `: ${refererPerson}`;
       application.message = `Recruiting-Kanal: ${channel}`;
+      if (RECRUITING_CHANNEL_IDS[referer]) {
+        application.recruiting_channel_id = RECRUITING_CHANNEL_IDS[referer];
+      }
     }
 
-    // Submit to Personio
-    const result = await createPersonioApplication(env, application);
+    // Submit to Personio. Lehnt Personio den Kanal ab, ohne Kanal erneut senden,
+    // damit keine Bewerbung an einer falschen Kanal-ID scheitert.
+    let result;
+    try {
+      result = await createPersonioApplication(env, application);
+    } catch (err) {
+      if (application.recruiting_channel_id && /channel|posting-validation/i.test(err.message)) {
+        console.warn(`Channel ${application.recruiting_channel_id} rejected, retrying without: ${err.message}`);
+        delete application.recruiting_channel_id;
+        result = await createPersonioApplication(env, application);
+      } else {
+        throw err;
+      }
+    }
 
     return jsonResponse({ success: true, id: result.data?.id }, 200, origin, env);
   } catch (err) {
