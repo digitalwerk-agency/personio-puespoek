@@ -518,8 +518,9 @@ const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // wie im Formular-JS
 const HONEYPOT_FIELD = "website";
 
 // Formular-Option (referer) → Personio-Recruiting-Kanal (Kanal-ID der Recruiting-API).
-// Quelle: Screenshot PÜSPÖK HR, 22.09.2026. Optionen ohne passenden Kanal fehlen hier
-// bewusst und werden nur als Nachricht übertragen.
+// Quelle: Screenshot PÜSPÖK HR, 22.09.2026. Optionen ohne eigenen Kanal laufen auf den
+// Sammelkanal „Jobbörse" (von HR am 22.09.2026 angelegt, Kanbert PPK_2601-295).
+const JOBBOERSE_CHANNEL_ID = 3340625;
 const RECRUITING_CHANNEL_IDS = {
   "Karriere.at": 1460772,
   "LinkedIn": 1460775,
@@ -528,6 +529,12 @@ const RECRUITING_CHANNEL_IDS = {
   "Print": 1460776,
   "TU Career Center": 1237154, // Universität Stellenbörse
   "Facebook": 1237152, // Social Media
+  "stepstone": JOBBOERSE_CHANNEL_ID,
+  "IG Windkraft": JOBBOERSE_CHANNEL_ID,
+  "PV Austria": JOBBOERSE_CHANNEL_ID,
+  "Newsletter": JOBBOERSE_CHANNEL_ID,
+  "Sonstige Jobbörse": JOBBOERSE_CHANNEL_ID,
+  "Sonstiges": JOBBOERSE_CHANNEL_ID,
 };
 
 function allowedOrigins(env) {
