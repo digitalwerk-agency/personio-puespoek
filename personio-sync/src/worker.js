@@ -497,7 +497,15 @@ async function createPersonioApplication(env, applicationData) {
     throw new Error(`Personio application failed: ${res.status} – ${errText}`);
   }
 
-  return res.json();
+  // Personio antwortet beim Anlegen mit 2xx und leerem Body. Leer = Erfolg.
+  const text = await res.text();
+  console.log(`Personio application created: ${res.status}${text ? " " + text.slice(0, 200) : " (empty body)"}`);
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
 }
 
 // --------------- Spam-Schutz /apply ---------------
