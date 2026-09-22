@@ -472,7 +472,13 @@ async function uploadDocumentToPersonio(env, file, category) {
   }
 
   const data = await res.json();
-  return data.data; // { uuid, original_filename, ... }
+  // Personio liefert { uuid, original_filename, ... } direkt, nicht in "data" verpackt.
+  // Beide Formen akzeptieren, damit ein Formatwechsel nicht jede Bewerbung abbricht.
+  const doc = data && data.data && data.data.uuid ? data.data : data;
+  if (!doc || !doc.uuid) {
+    throw new Error(`Personio document upload: unexpected response ${JSON.stringify(data).slice(0, 300)}`);
+  }
+  return doc;
 }
 
 async function createPersonioApplication(env, applicationData) {
