@@ -151,6 +151,9 @@ function cleanHtmlForWebflow(html) {
     // <div> → <p>
     .replace(/<div[^>]*>/g, "<p>")
     .replace(/<\/div>/g, "</p>")
+    // Nackter Text nach Liste/Überschrift (Personio setzt dort kein <p>) in einen Absatz
+    // packen, sonst erzeugt der <br><br>-Split darunter ein verwaistes </p>
+    .replace(/(<\/(?:ul|ol|h3)>)\s*(?!<(?:p|h3|ul|ol)\b)([^<][\s\S]*?|<(?!\/?(?:p|h3|ul|ol)\b)[\s\S]*?)(?=<(?:p|h3|ul|ol)\b|$)/g, "$1<p>$2</p>")
     // <br><br> → Absatzwechsel
     .replace(/<br\s*\/?>\s*<br\s*\/?>/g, "</p><p>")
     // Einzelne <br> behalten (Webflow kann das)
@@ -167,6 +170,9 @@ function cleanHtmlForWebflow(html) {
     .replace(/<p>\s*<strong>((?:(?!<\/?p>)[\s\S])*?)<\/strong>\s*<\/p>/gi, "<h3>$1</h3>")
     // Fettungen im Fließtext raus (laut CI kein Bold im Body)
     .replace(/<\/?strong>/gi, "")
+    // Zeilenumbrüche am Absatzanfang/-ende sind Reste des Splits
+    .replace(/<p>\s*(?:<br\s*\/?>\s*)+/g, "<p>")
+    .replace(/(?:\s*<br\s*\/?>)+\s*<\/p>/g, "</p>")
     // Leere Absätze, die erst durch den <br><br>-Split entstanden sind
     .replace(/<p>\s*<\/p>/g, "")
     // Mehrfache Leerzeilen/Whitespace komprimieren
