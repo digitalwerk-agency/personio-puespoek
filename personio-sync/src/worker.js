@@ -161,10 +161,14 @@ function cleanHtmlForWebflow(html) {
     .replace(/<\/strong>\s*<\/strong>/g, "</strong>")
     .replace(/<em>\s*<em>/g, "<em>")
     .replace(/<\/em>\s*<\/em>/g, "</em>")
-    // Absatz, der komplett fett ist, ist in Wahrheit eine Überschrift → h3
-    .replace(/<p>\s*<strong>([\s\S]*?)<\/strong>\s*<\/p>/gi, "<h3>$1</h3>")
+    // Absatz, der komplett fett ist, ist in Wahrheit eine Überschrift → h3.
+    // Darf keine Absatzgrenze überspringen (Personio liefert verschachtelte <strong>,
+    // die nach dem <br><br>-Split über zwei Absätze laufen → sonst <h3>…</p><p>…</h3>).
+    .replace(/<p>\s*<strong>((?:(?!<\/?p>)[\s\S])*?)<\/strong>\s*<\/p>/gi, "<h3>$1</h3>")
     // Fettungen im Fließtext raus (laut CI kein Bold im Body)
     .replace(/<\/?strong>/gi, "")
+    // Leere Absätze, die erst durch den <br><br>-Split entstanden sind
+    .replace(/<p>\s*<\/p>/g, "")
     // Mehrfache Leerzeilen/Whitespace komprimieren
     .replace(/\n{3,}/g, "\n\n")
     .trim();
