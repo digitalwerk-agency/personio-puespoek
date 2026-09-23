@@ -537,6 +537,11 @@ const RECRUITING_CHANNEL_IDS = {
   "Sonstiges": JOBBOERSE_CHANNEL_ID,
 };
 
+// Custom-Attribute des Kandidaten (API-Namen von PÜSPÖK HR, Livia, 23.09.2026, Kanbert PPK_2601-295).
+// Sichtbar in Personio beim Kandidaten unter „Wichtige Angaben".
+const ATTR_PRIVACY_CONSENT = "custom_attribute_2451161"; // Datenverarbeitung zustimmen
+const ATTR_REFERER = "custom_attribute_2451165"; // Referer (wer empfohlen hat / welche Jobbörse)
+
 function allowedOrigins(env) {
   return (env.ALLOWED_ORIGINS || "")
     .split(",")
@@ -688,7 +693,7 @@ async function handleApplication(request, env) {
       application.attributes = attributes;
     }
 
-    // Recruiting channel (message field as workaround)
+    // Recruiting channel (+ message mit den Zusatzangaben)
     const referer = formData.get("referer");
     const refererOther = formData.get("referer_other");
     const refererPerson = formData.get("referer_person");
@@ -702,8 +707,23 @@ async function handleApplication(request, env) {
       }
     }
 
-    // Submit to Personio. Lehnt Personio den Kanal ab, ohne Kanal erneut senden,
-    // damit keine Bewerbung an einer falschen Kanal-ID scheitert.
+    // Custom-Attribute „Wichtige Angaben": Datenschutz-Zustimmung (Checkbox ist Pflicht,
+    // der Browser schickt "on") und Referer (empfehlende Person bzw. Jobbörse, sonst die Option).
+    // Separat gehalten, damit sie bei einem Attribut-Fehler abgeworfen werden können.
+    const customAttributes = [];
+    if (formData.get("privacy_policy")) {
+      customAttributes.push({ id: ATTR_PRIVACY_CONSENT, value: "Ja" });
+    }
+    const refererValue = (refererPerson || refererOther || referer || "").trim();
+    if (refererValue) {
+      customAttributes.push({ id: ATTR_REFERER, value: refererValue });
+    }
+    if (customAttributes.length > 0) {
+      application.attributes = [...(application.attributes || []), ...customAttributes];
+    }
+
+    // Submit to Personio. Lehnt Personio den Kanal oder ein Custom-Attribut ab, ohne das
+    // jeweilige Feld erneut senden, damit keine Bewerbung an einer Personio-Konfiguration scheitert.
     let result;
     try {
       result = await createPersonioApplication(env, application);
@@ -711,6 +731,11 @@ async function handleApplication(request, env) {
       if (application.recruiting_channel_id && /channel|posting-validation/i.test(err.message)) {
         console.warn(`Channel ${application.recruiting_channel_id} rejected, retrying without: ${err.message}`);
         delete application.recruiting_channel_id;
+        result = await createPersonioApplication(env, application);
+      } else if (customAttributes.length > 0 && /attribute-validation/i.test(err.message)) {
+        console.warn(`Custom attributes rejected, retrying without: ${err.message}`);
+        application.attributes = (application.attributes || []).filter((a) => !customAttributes.includes(a));
+        if (application.attributes.length === 0) delete application.attributes;
         result = await createPersonioApplication(env, application);
       } else {
         throw err;
