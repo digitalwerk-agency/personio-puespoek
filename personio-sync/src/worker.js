@@ -153,6 +153,8 @@ function cleanHtmlForWebflow(html) {
     .replace(/<\/div>/g, "</p>")
     // Nackter Text nach Liste/Überschrift (Personio setzt dort kein <p>) in einen Absatz
     // packen, sonst erzeugt der <br><br>-Split darunter ein verwaistes </p>
+    // Leere Fettungen vorab raus, sonst trennt „<br><strong> </strong><br>" keinen Absatz
+    .replace(/<(strong|em)>\s*<\/\1>/g, "")
     .replace(/(<\/(?:ul|ol|h3)>)\s*(?!<(?:p|h3|ul|ol)\b)([^<][\s\S]*?|<(?!\/?(?:p|h3|ul|ol)\b)[\s\S]*?)(?=<(?:p|h3|ul|ol)\b|$)/g, "$1<p>$2</p>")
     // <br><br> → Absatzwechsel
     .replace(/<br\s*\/?>\s*<br\s*\/?>/g, "</p><p>")
@@ -167,7 +169,12 @@ function cleanHtmlForWebflow(html) {
     // Absatz, der komplett fett ist, ist in Wahrheit eine Überschrift → h3.
     // Darf keine Absatzgrenze überspringen (Personio liefert verschachtelte <strong>,
     // die nach dem <br><br>-Split über zwei Absätze laufen → sonst <h3>…</p><p>…</h3>).
-    .replace(/<p>\s*<strong>((?:(?!<\/?p>)[\s\S])*?)<\/strong>\s*<\/p>/gi, "<h3>$1</h3>")
+    // Nur kurze Zeilen ohne Satzzeichen am Ende: fett gesetzte Sätze/Claims
+    // („Du bist begeistert … ausgeschrieben?", „Werde Teil … auf dich!") bleiben Absatz.
+    .replace(/<p>\s*<strong>((?:(?!<\/?p>)[\s\S])*?)<\/strong>\s*<\/p>/gi, (match, inner) => {
+      const text = inner.replace(/<[^>]*>/g, "").trim();
+      return text.length <= 50 && !/[.?!:;,]$/.test(text) ? `<h3>${inner}</h3>` : `<p>${inner}</p>`;
+    })
     // Fettungen im Fließtext raus (laut CI kein Bold im Body)
     .replace(/<\/?strong>/gi, "")
     // Zeilenumbrüche am Absatzanfang/-ende sind Reste des Splits
@@ -175,6 +182,12 @@ function cleanHtmlForWebflow(html) {
     .replace(/(?:\s*<br\s*\/?>)+\s*<\/p>/g, "</p>")
     // Leere Absätze, die erst durch den <br><br>-Split entstanden sind
     .replace(/<p>\s*<\/p>/g, "")
+    // Kurze Zeile ohne Satzzeichen direkt vor einer Liste ist eine ungestylte
+    // Zwischenüberschrift („Deine Aufgaben", „Dein Job") → h3
+    .replace(/<p>([^<]{1,50})<\/p>(\s*<(?:ul|ol)\b)/g, (match, text, list) =>
+      /[.?!:;,]\s*$/.test(text) ? match : `<h3>${text.trim()}</h3>${list}`)
+    // Personio wiederholt den Blocktitel manchmal im Text („Dein Job" … „Dein Job") → doppelte h3 raus
+    .replace(/(<h3>([^<]+)<\/h3>(?:\s*<p>(?:(?!<\/p>)[\s\S])*<\/p>)*)\s*<h3>\2<\/h3>/g, "$1")
     // Mehrfache Leerzeilen/Whitespace komprimieren
     .replace(/\n{3,}/g, "\n\n")
     .trim();
