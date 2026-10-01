@@ -22,7 +22,7 @@ into a Webflow CMS Collection via a Cloudflare Worker.
 - **Source:** Personio XML feed at `https://puespoek.jobs.personio.com/xml`
 - **Target:** Webflow CMS Collection "Jobs" (ID: `69e8c53f49395a3e534bf834`, Slug: `offene-stellen`)
 - **Runtime:** Cloudflare Worker (Free Plan)
-- **Schedule:** Cron every 6 hours
+- **Schedule:** Cron every 3 hours
 - **Sync key:** `personio-id` field links Personio positions to Webflow CMS items
 - **Deploy:** Auto via Cloudflare Git integration on push to main
 

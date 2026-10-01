@@ -2,9 +2,9 @@ name = "personio-webflow-sync"
 main = "src/worker.js"
 compatibility_date = "2024-12-01"
 
-# Sync alle 6 Stunden
+# Sync alle 3 Stunden (seit 30.09.26, vorher 6h)
 [triggers]
-crons = ["0 */6 * * *"]
+crons = ["0 */3 * * *"]
 
 [vars]
 PERSONIO_XML_URL = "https://puespoek.jobs.personio.com/xml"

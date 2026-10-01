@@ -1,6 +1,6 @@
 # Personio → Webflow Job Sync
 
-Cloudflare Worker der alle 6 Stunden die offenen Stellen von Personio XML
+Cloudflare Worker der alle 3 Stunden die offenen Stellen von Personio XML
 in die Webflow CMS Job-Collection synchronisiert.
 
 ## Voraussetzungen
@@ -78,7 +78,7 @@ curl -X POST http://localhost:8787/sync
 | `/preview` | GET | Personio-Daten als JSON (kein Push) |
 | `/sync` | POST | Manuellen Sync ausloesen |
 
-Der Cron-Trigger laeuft automatisch alle 6 Stunden.
+Der Cron-Trigger laeuft automatisch alle 3 Stunden.
 
 ## Feld-Mapping Personio → Webflow
 
@@ -104,7 +104,7 @@ In `wrangler.toml` den Cron-Ausdruck aendern:
 
 ```toml
 [triggers]
-crons = ["0 */6 * * *"]  # alle 6 Stunden
+crons = ["0 */3 * * *"]  # alle 3 Stunden
 # crons = ["0 8 * * *"]  # taeglich um 8:00 UTC
 # crons = ["*/30 * * * *"]  # alle 30 Minuten
 ```

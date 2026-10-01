@@ -859,7 +859,7 @@ export default {
           "GET /preview": "Personio-Daten als JSON ansehen (kein Push)",
           "POST /apply": "Bewerbung an Personio weiterleiten",
         },
-        cron: "Alle 6 Stunden automatisch",
+        cron: "Alle 3 Stunden automatisch",
       }, null, 2),
       { headers: { "Content-Type": "application/json" } }
     );

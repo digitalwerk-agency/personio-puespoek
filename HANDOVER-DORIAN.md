@@ -2,7 +2,7 @@
 
 ## Status: LIVE
 
-Der Sync ist deployed und läuft automatisch alle 6 Stunden.
+Der Sync ist deployed und läuft automatisch alle 3 Stunden.
 
 - **Worker URL:** `https://personio-webflow-sync.achtzehngrad.workers.dev`
 - **Cloudflare Account:** Raphael, office@achtzehngrad.at (achtzehngrad.workers.dev)
@@ -15,7 +15,7 @@ Der Sync ist deployed und läuft automatisch alle 6 Stunden.
 
 ```
 Personio XML Feed          Cloudflare Worker           Webflow CMS
-(alle offenen Stellen)     (alle 6h via Cron)          (Collection "Jobs")
+(alle offenen Stellen)     (alle 3h via Cron)          (Collection "Jobs")
 
 puespoek.jobs.personio     personio-webflow-sync       CMS Items mit
   .com/xml                   .achtzehngrad.workers.dev       personio-id
@@ -46,7 +46,7 @@ puespoek.jobs.personio     personio-webflow-sync       CMS Items mit
 
 ## Feldmapping: Personio → Webflow
 
-### Automatisch vom Worker befüllt (werden alle 6h aktualisiert)
+### Automatisch vom Worker befüllt (werden alle 3h aktualisiert)
 
 | Webflow Feld-Slug | Typ | Quelle |
 |---|---|---|
@@ -119,13 +119,13 @@ curl -X POST https://personio-webflow-sync.achtzehngrad.workers.dev/sync
 
 ## Automatischer Cron
 
-Der Worker läuft alle 6 Stunden automatisch (0:00, 6:00, 12:00, 18:00 UTC).
+Der Worker läuft alle 3 Stunden automatisch (0:00, 3:00, 6:00 … 21:00 UTC).
 
 Cron-Schedule ändern in `wrangler.toml`:
 
 ```toml
 [triggers]
-crons = ["0 */6 * * *"]    # alle 6 Stunden (aktuell)
+crons = ["0 */3 * * *"]    # alle 3 Stunden (aktuell, seit 30.09.26)
 # crons = ["0 8 * * *"]    # täglich um 8:00 UTC
 # crons = ["*/30 * * * *"] # alle 30 Minuten
 ```
