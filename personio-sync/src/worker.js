@@ -371,6 +371,14 @@ async function publishItems(env, itemIds) {
   }
 }
 
+async function hashFieldData(fieldData) {
+  // SHA-256 ueber die Felder mit stabil sortierten Keys (ohne sync-hash selbst)
+  const keys = Object.keys(fieldData).filter((k) => k !== "sync-hash").sort();
+  const stable = JSON.stringify(keys.map((k) => [k, fieldData[k] ?? null]));
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stable));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // --------------- Sync Logic ---------------
 
 async function syncJobs(env) {
@@ -411,9 +419,17 @@ async function syncJobs(env) {
 
   // 4. Neue und geaenderte Jobs
   const jobSlugs = buildJobSlugs(personioJobs);
+  const unchanged = [];
   for (const job of personioJobs) {
     const fieldData = personioJobToWebflowItem(job, jobSlugs[job.personioId]);
+    // Fingerabdruck der Personio-Daten: nur schreiben/publishen, wenn er sich geaendert hat
+    fieldData["sync-hash"] = await hashFieldData(fieldData);
     const existing = existingByPersonioId[job.personioId];
+
+    if (existing && existing.fieldData?.["sync-hash"] === fieldData["sync-hash"]) {
+      unchanged.push(existing.id);
+      continue;
+    }
 
     if (!existing) {
       // Neuer Job → erstellen
@@ -464,6 +480,7 @@ async function syncJobs(env) {
     total: personioJobs.length,
     created: created.length,
     updated: updated.length,
+    unchanged: unchanged.length,
     deleted: deleted.length,
     log,
   };
@@ -859,7 +876,7 @@ export default {
           "GET /preview": "Personio-Daten als JSON ansehen (kein Push)",
           "POST /apply": "Bewerbung an Personio weiterleiten",
         },
-        cron: "Alle 3 Stunden automatisch",
+        cron: "Alle 5 Minuten automatisch (schreibt nur geaenderte Stellen)",
       }, null, 2),
       { headers: { "Content-Type": "application/json" } }
     );
